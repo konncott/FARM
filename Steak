@@ -1,0 +1,202 @@
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local gui = player:WaitForChild("PlayerGui")
+local steakInterior = workspace.Map.Tiles.ShoppingTile.SteakHouse.Interior
+
+-- UI
+local screenGui = Instance.new("ScreenGui", gui)
+screenGui.Name = "AutoFarmUI"
+screenGui.ResetOnSpawn = false
+
+-- ปุ่ม Show UI
+local showButton = Instance.new("TextButton", screenGui)
+showButton.Size = UDim2.new(0, 100, 0, 30)
+showButton.Position = UDim2.new(0, 10, 0, 10)
+showButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+showButton.BackgroundTransparency = 0.2
+showButton.Text = " - Show UI"
+showButton.TextColor3 = Color3.new(1, 1, 1)
+showButton.Font = Enum.Font.Gotham
+showButton.TextSize = 14
+showButton.Visible = false
+
+-- กล่องหลัก
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 250, 0, 150)
+mainFrame.Position = UDim2.new(0.02, 0, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BackgroundTransparency = 0.3
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+
+-- ปุ่มปิด ❌
+local closeButton = Instance.new("TextButton", mainFrame)
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -30, 0, 0)
+closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+closeButton.BackgroundTransparency = 0.2
+closeButton.Text = "❌"
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 14
+closeButton.BorderSizePixel = 0
+closeButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- ปุ่มซ่อน 🫥 (ถัดจากปิด)
+local hideButton = Instance.new("TextButton", mainFrame)
+hideButton.Size = UDim2.new(0, 30, 0, 30)
+hideButton.Position = UDim2.new(1, -60, 0, 0)
+hideButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+hideButton.BackgroundTransparency = 0.2
+hideButton.Text = "-"
+hideButton.TextColor3 = Color3.new(1, 1, 1)
+hideButton.Font = Enum.Font.Gotham
+hideButton.TextSize = 14
+hideButton.BorderSizePixel = 0
+hideButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+    showButton.Visible = true
+end)
+
+showButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = true
+    showButton.Visible = false
+end)
+
+-- หัวข้อ
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, -70, 0, 30)
+title.Position = UDim2.new(0, 5, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "             🥩 AutoFarm 🥩"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- ปุ่ม AutoFarm
+local toggleFarm = Instance.new("TextButton", mainFrame)
+toggleFarm.Position = UDim2.new(0.05, 0, 0.35, 0)
+toggleFarm.Size = UDim2.new(0.9, 0, 0, 30)
+toggleFarm.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleFarm.BackgroundTransparency = 0.2
+toggleFarm.TextColor3 = Color3.new(1, 1, 1)
+toggleFarm.Text = "🔁 AutoFarm: OFF"
+toggleFarm.Font = Enum.Font.Gotham
+toggleFarm.TextSize = 14
+
+-- ปุ่ม AutoGetSteak
+local toggleGetSteak = Instance.new("TextButton", mainFrame)
+toggleGetSteak.Position = UDim2.new(0.05, 0, 0.65, 0)
+toggleGetSteak.Size = UDim2.new(0.9, 0, 0, 30)
+toggleGetSteak.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleGetSteak.BackgroundTransparency = 0.2
+toggleGetSteak.TextColor3 = Color3.new(1, 1, 1)
+toggleGetSteak.Text = "🍖 Get Steak: ON"
+toggleGetSteak.Font = Enum.Font.Gotham
+toggleGetSteak.TextSize = 14
+
+-- สถานะ
+getgenv().AutoFarmEnabled = false
+getgenv().AutoGetSteak = true
+
+toggleFarm.MouseButton1Click:Connect(function()
+    AutoFarmEnabled = not AutoFarmEnabled
+    toggleFarm.Text = AutoFarmEnabled and "🔁 AutoFarm: ON" or "🔁 AutoFarm: OFF"
+end)
+
+toggleGetSteak.MouseButton1Click:Connect(function()
+    AutoGetSteak = not AutoGetSteak
+    toggleGetSteak.Text = AutoGetSteak and "🍖 Get Steak: ON" or "🍖 Get Steak: OFF"
+end)
+
+-- ฟังก์ชันระบบ
+local function click(button)
+    local pos = button.AbsolutePosition
+    local size = button.AbsoluteSize
+    local x = math.clamp(pos.X + size.X / 2, 0, camera.ViewportSize.X)
+    local y = math.clamp(pos.Y + size.Y * 1.6, 0, camera.ViewportSize.Y)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+    task.wait()
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+end
+
+local function teleport(pos, time)
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local tween = TweenService:Create(root, TweenInfo.new(time or 0.3), {
+        CFrame = typeof(pos) == "CFrame" and pos or CFrame.new(pos)
+    })
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+local function getPrompt(obj)
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then return d end
+    end
+end
+
+-- ฟาร์มหลัก
+local lastTick = 0
+RunService.RenderStepped:Connect(function()
+    if not AutoFarmEnabled then return end
+    if tick() - lastTick < 0.3 then return end
+
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local job = player:GetAttribute("Job")
+    local prompt = getPrompt(steakInterior.Fridge)
+
+    if job ~= "steakhouse_cook" then
+        local part = steakInterior.SteakHouseBeacon.TouchPart
+        if part then
+            teleport(part.Position)
+            task.spawn(function()
+                local jobGui = gui:FindFirstChild("JobApplication")
+                if jobGui then
+                    click(jobGui.JobApplicationFrame.ApplyJob)
+                end
+            end)
+        end
+    else
+        local barUI = gui:FindFirstChild("ProgressBar") and gui.ProgressBar.ProgressBarFrame
+        local main = barUI and barUI.MainFrame
+        local input = barUI and barUI.InputFrame
+
+        if prompt and not barUI.Visible and AutoGetSteak then
+            local cf = prompt.Parent.Parent.CFrame
+            teleport(cf.Position + (cf.LookVector * -6))
+            prompt:InputHoldBegin()
+            prompt:InputHoldEnd()
+        end
+
+        local beacon = workspace:FindFirstChild("Beacon")
+        if beacon and beacon:FindFirstChild("Base") then
+            teleport(beacon.Base.CFrame + Vector3.new(0, 1.5, 0))
+        end
+
+        if barUI.Visible and main and main.BarAmount and main.CookedPerfectly then
+            if main.BarAmount.Size.X.Scale >= main.CookedPerfectly.Position.X.Scale then
+                task.spawn(function()
+                    click(input.FinishBar)
+                end)
+            end
+        end
+    end
+
+    lastTick = tick()
+end)
